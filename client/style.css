@@ -1,4 +1,41 @@
 body{
   margin: 0;
   padding: 0;
+  font-family: monospace;
+  background-color: #fcfcfc;
+}
+img{
+  image-rendering: -webkit-optimize-contrast;
+}
+#score{
+  position: fixed;
+  margin: 24px;
+  font-size: 1.25em;
+  user-select: none;
+  cursor: default;
+}
+#team_scores{
+  position: fixed;
+  right: 0px;
+  margin: 24px;
+  font-size: 1.33em;
+  user-select: none;
+  cursor: default;
+}
+#red_score{
+  color: #d20000;
+}
+#green_score{
+  color: #2e8b57;
+}
+#blue_score{
+  color: #191970;
+}
+#health{
+  position: fixed;
+  bottom: 0px;
+  margin: 24px;
+  font-size: 1.25em;
+  user-select: none;
+  cursor: default;
 }

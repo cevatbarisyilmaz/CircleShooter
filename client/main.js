@@ -5,12 +5,22 @@ socket.on("connect", function onsocketConnected () {
 	console.log("connected to server"); 
 });
 
+var MAP_SIZE_X = 15000;
+var MAP_SIZE_Y = 7500;
+var MAP_MIDDLE_X = MAP_SIZE_X / 2;
+var MAP_MIDDLE_Y = MAP_SIZE_Y / 2;
 var SCALE = 0.15;
+var FIRE_RATE = 10;
+var score_span = document.getElementById("score_point");
+var health_span = document.getElementById("health_point");
+var red_score_span = document.getElementById("red_score_span");
+var green_score_span = document.getElementById("green_score_span");
+var blue_score_span = document.getElementById("blue_score_span");
 
 
 var renderer = PIXI.autoDetectRenderer(window.innerWidth, window.innerHeight, {
-	backgroundColor: 0xfcfcfc,
-	antialias: true
+	antialias: true,
+	transparent: true
 });
 renderer.view.style.position = "absolute";
 renderer.view.style.display = "block";
@@ -22,8 +32,12 @@ renderer.render(stage);
 //renderer.resize(window.innerWidth, window.innerHeight);
 //renderer.backgroundColor = 0xfcfcfc;
 
+
 var xCofactor;
 var yCofactor;
+
+var fireVector;
+var fireInterval;
 
 function setSizes(){
 	console.log("Setting...");
@@ -34,21 +48,36 @@ function setSizes(){
 }
 
 renderer.plugins.interaction.on('mousedown', function(event){
-	console.log('mousedown');
-	var vector = {x: event.data.global.x - xCofactor * SCALE, y: event.data.global.y - yCofactor * SCALE};
-	console.log(vector);
-	fire(vector);
+	if(fireInterval != null)
+		clearInterval(fireInterval);
+	fireVector = {x: event.data.global.x - xCofactor * SCALE, y: event.data.global.y - yCofactor * SCALE};
+	fire();
+	fireInterval = setInterval(fire, FIRE_RATE);
+});
+
+renderer.plugins.interaction.on('mouseout', function(event){
+	if(fireInterval != null){
+		clearInterval(fireInterval);
+		fireInterval = null;
+	}
 });
 
 renderer.plugins.interaction.on('mousemove', function(event){
-	//console.log('mousemove');
-	//console.log(data);
+	fireVector = {x: event.data.global.x - xCofactor * SCALE, y: event.data.global.y - yCofactor * SCALE};
 });
 
 renderer.plugins.interaction.on('mouseup', function(event){
-	console.log('mouseup');
-	//console.log(event);
+	clearInterval(fireInterval);
+	fireInterval = null;
 });
+
+/*
+renderer.plugins.interaction.on('rightclick', function(event){
+	console.log("c");
+	var vector = {x: event.data.global.x - xCofactor * SCALE, y: event.data.global.y - yCofactor * SCALE};
+	specialFire(vector);
+});
+*/
 
 window.onresize = setSizes;
 window.onload = setSizes;
@@ -59,13 +88,13 @@ window.addEventListener("blur", function(event) {
 }, true);
 
 var FIRE_SPEED = 50;
-var PLAYER_SIZE = 213;
+var PLAYER_SIZE = 216;
 var players = {};
 var fires = {};
 var id;
 var myPosition = {x: 0, y: 0};
 var move = {x: 0, y: 0};
-var control = {left: false, up: false, right: false, down: false}
+var control = {left: false, up: false, right: false, down: false};
 
 function getPlayerBody(team){
 	var circle = new PIXI.Graphics();
@@ -82,10 +111,21 @@ function getPlayerBody(team){
 	return circle;
 }
 
-function getFireBody(){
+function getFireBody(colorName){
 	var circle = new PIXI.Graphics();
+	console.log(colorName);
 	var color;
-	circle.beginFill(0);
+	if (colorName == null)
+		color = 0;
+	else if(colorName == 'green')
+		color = 0x2e8b57;
+	else if(colorName == 'blue')
+		color = 0x191970;
+	else if(colorName == 'red')
+		color = 0xd20000;
+	else
+		color = 0;
+	circle.beginFill(color);
 	circle.drawCircle(0, 0, PLAYER_SIZE / 4);   //(x,y,radius)
 	circle.endFill();
 	return circle;
@@ -97,6 +137,7 @@ function resetControls(){
 	control.up = false;
 	control.down = false;
 	updateControls();
+	clearInterval(fireInterval);
 }
 
 
@@ -104,6 +145,12 @@ function resetControls(){
 function gameLoop() {
   requestAnimationFrame(gameLoop);
   renderer.render(stage);
+}
+
+window.oncontextmenu = function ()
+{
+	specialFire();
+  return false;     // cancel default menu
 }
 
 document.addEventListener('keydown', (event) => {
@@ -124,6 +171,12 @@ document.addEventListener('keydown', (event) => {
     case 's': case 'S': case 'ArrowDown':
 	   	control.down = true;
 	   	updateControls();
+			break;
+		case ' ':
+			skill1();
+			break;
+		case 'q': case 'e':
+			skill2();
 			break;
 	}
 });
@@ -150,6 +203,14 @@ document.addEventListener('keyup', (event) => {
 	}
 });
 
+function skill1(){
+	socket.emit('skill1');
+}
+
+function skill2(){
+	socket.emit('skill2');
+}
+
 function updateControls(){
 	if(control.left){
 		move.x = control.right ? 0 : -1;
@@ -169,25 +230,61 @@ function updateControls(){
 		move.y = 0;
 	socket.emit('input', move);
 }
-
+var background = PIXI.Sprite.fromImage('client/assets/untitled.svg');
 socket.on('initialize', function(data){
-	console.log("My id is " + data);
-	id = data;
+	//console.log("My id is " + data.id);
+	
+	background.x = 0;
+	background.y = 0;
+	background.width = MAP_SIZE_X;
+	background.height = MAP_SIZE_Y;
+
+	stage.addChild(background);
+
+	id = data.id;
+	updateTeamScores(data.scores);
 	gameLoop();
 });
 
 socket.on('removePlayer', function(data){
-	stage.removeChild(players[data].body);
-	delete players[data];
+	var player = players[data];
+	if(player != null){
+		stage.removeChild(player.body);
+		delete players[data];
+	}
 });
 
+socket.on('updateScore', function(data){
+	score_span.innerText = data;
+});
+
+socket.on('updateHealth', function(data){
+	health_span.innerText = data;
+});
+
+function updateTeamScores(data){
+	red_score_span.innerText = data.red;
+	blue_score_span.innerText = data.blue;
+	green_score_span.innerText = data.green;
+}
+
+socket.on('updateTeamScores', function(data){
+	updateTeamScores(data);
+});
+
+
 socket.on('removeFire', function(data){
-	stage.removeChild(fires[data].body);
-	delete fires[data];
+	var fire = fires[data];
+	if(fire != null){
+		stage.removeChild(fires[data].body);
+		delete fires[data];
+	}
 });
 
 socket.on('update', function(data){
 	myPosition = data.players[id].position;
+	background.x = 0 - myPosition.x + xCofactor;
+	background.y = myPosition.y - MAP_SIZE_Y + yCofactor;
 	for (var player in data.players) {
 	  var temp = players[player];
 	  var temp2 = data.players[player];
@@ -203,7 +300,7 @@ socket.on('update', function(data){
 	  var temp = fires[fire];
 	  var temp2 = data.fires[fire];
 	  if(temp == null){
-	  	fires[fire] = {body: getFireBody()};
+	  	fires[fire] = {body: getFireBody(temp2.team)};
 	  	temp = fires[fire];
 	  	stage.addChild(temp.body);
 	  }
@@ -213,19 +310,26 @@ socket.on('update', function(data){
 });
 
 function normalizeVector(vector, scale){
-	console.log(vector);
+	//console.log(vector);
 	var norm = Math.sqrt(vector.x * vector.x + vector.y * vector.y);
 	var normalized = {x: 0, y: 0};
   if (norm != 0) {
-    normalized.x = Math.floor(scale * vector.x / norm);
-    normalized.y = Math.floor(scale * vector.y / norm);
+    normalized.x = Math.round(scale * vector.x / norm);
+    normalized.y = Math.round(scale * vector.y / norm);
   }
   return normalized;
 }
 
-function fire(vector){
+function fire(){
+	var vector = Object.assign({}, fireVector);
 	vector.y = -vector.y;
 	vector = normalizeVector(vector, FIRE_SPEED);
-	console.log(vector);
 	socket.emit('fire', vector);
+}
+
+function specialFire(){
+	var vector = Object.assign({}, fireVector);
+	vector.y = -vector.y;
+	vector = normalizeVector(vector, FIRE_SPEED);
+	socket.emit('skill3', vector);
 }

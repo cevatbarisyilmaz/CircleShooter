@@ -7,6 +7,23 @@
 		<link rel="stylesheet" href="client/style.css">
 	</head>
 	<body>
+		<div id="score">
+			Score: <span id="score_point">0</span>
+		</div>
+		<div id="team_scores">
+			<div id="red_score">
+				Red: <span id="red_score_span">0</span>
+			</div>
+			<div id="green_score">
+				Green: <span id="green_score_span">0</span>
+			</div>
+			<div id="blue_score">
+				Blue: <span id="blue_score_span">0</span>
+			</div>
+		</div>
+		<div id="health">
+			Health: <span id="health_point">5</span>
+		</div>
 	</body>
 	<script src="/socket.io/socket.io.js"></script>
 	<script src="client/lib/pixi.min.js"></script>
