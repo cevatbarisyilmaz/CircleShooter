@@ -7,3 +7,5 @@ http://circleshooter.cleverapps.io/ [Europe]
 https://circleshooter.herokuapp.com/ [North America]
 
 Use 'node app.js' command to start the server.
+
+Controls: WASD or Arrow Keys, Space, Left Click and Right Click
